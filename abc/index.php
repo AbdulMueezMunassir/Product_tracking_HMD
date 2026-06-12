@@ -74,13 +74,6 @@
                   </div>';
             unset($_SESSION['login_error']);
         }
-        if (isset($_SESSION['login_success'])) {
-            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="fas fa-check-circle"></i> ' . $_SESSION['login_success'] . '
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                  </div>';
-            unset($_SESSION['login_success']);
-        }
         ?>
         
         <form method="POST" action="authenticate.php">

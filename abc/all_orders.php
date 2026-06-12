@@ -41,36 +41,23 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        .sidebar {
-            width: 280px;
-            position: fixed;
-            height: 100vh;
-            background: linear-gradient(135deg, #1e2a3e, #15232e);
-            color: white;
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .main-content { margin-left: 280px; padding: 25px 35px; }
+        .sidebar { width: 280px; position: fixed; left: -280px; height: 100vh; background: linear-gradient(135deg, #1e2a3e, #15232e); color: white; padding: 20px; transition: left 0.3s; z-index: 1000; overflow-y: auto; }
+        .sidebar.open { left: 0; }
+        .main-content { margin-left: 0; padding: 25px 35px; transition: margin-left 0.3s; }
+        
+        @media (min-width: 992px) { .sidebar { left: 0; width: 280px; } .menu-toggle { display: none; } .main-content { margin-left: 280px; } }
+        @media (max-width: 991px) { .main-content { padding: 15px; } .menu-toggle { display: block; position: fixed; top: 15px; left: 15px; z-index: 1001; background: #1e2a3e; color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; } }
+        
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .sidebar-overlay.active { display: block; }
+        
         .nav-link { color: #cfdde6; padding: 12px 20px; margin: 5px 0; border-radius: 12px; text-decoration: none; display: block; transition: all 0.3s; }
         .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.1); color: white; transform: translateX(5px); }
         .nav-link i { width: 28px; }
         
-        .order-card {
-            background: white;
-            border-radius: 20px;
-            margin-bottom: 25px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            transition: all 0.3s;
-        }
+        .order-card { background: white; border-radius: 20px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: all 0.3s; }
         .order-card:hover { box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
-        .order-header {
-            background: linear-gradient(135deg, #1e2a3e, #15232e);
-            color: white;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
+        .order-header { background: linear-gradient(135deg, #1e2a3e, #15232e); color: white; padding: 15px 25px; cursor: pointer; transition: all 0.3s; }
         .order-header:hover { background: linear-gradient(135deg, #2d3e5a, #1e2a3e); }
         .order-header .toggle-icon { transition: transform 0.3s; }
         .order-header.collapsed .toggle-icon { transform: rotate(-90deg); }
@@ -92,27 +79,15 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
         .product-table th { background: #f1f5f9; padding: 12px; text-align: left; font-weight: 600; font-size: 0.8rem; }
         .product-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
         .product-image { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; }
-        .discount-tag { background: #fef3c7; color: #d97706; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; }
         
-        .branch-comment-box {
-            background: #e0f2fe;
-            border-left: 4px solid #0284c7;
-            padding: 12px 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-        }
-        .availability-box {
-            padding: 12px 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-        }
+        .branch-comment-box { background: #e0f2fe; border-left: 4px solid #0284c7; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px; }
+        .availability-box { padding: 12px 15px; border-radius: 12px; margin-bottom: 20px; }
         .availability-available { background: #dcfce7; border-left: 4px solid #22c55e; }
         .availability-partial { background: #fed7aa; border-left: 4px solid #f97316; }
         .availability-not { background: #fee2e2; border-left: 4px solid #ef4444; }
         
-        .product-available-badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; display: inline-block; }
-        .product-avail-yes { background: #dcfce7; color: #166534; }
-        .product-avail-no { background: #fee2e2; color: #991b1b; }
+        .product-avail-yes { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; display: inline-block; }
+        .product-avail-no { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; display: inline-block; }
         
         @media (max-width: 768px) {
             .sidebar { width: 240px; }
@@ -120,20 +95,12 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
             .product-table { font-size: 0.75rem; }
             .product-table th, .product-table td { padding: 8px; }
         }
-        @media (max-width: 576px) {
-            .sidebar { transform: translateX(-100%); position: fixed; z-index: 1000; }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
-            .menu-toggle { display: block; position: fixed; top: 15px; left: 15px; z-index: 1001; background: #1e2a3e; color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; }
-            .top-header { margin-top: 50px; }
-        }
-        @media (min-width: 577px) { .menu-toggle { display: none; } }
     </style>
 </head>
 <body>
 
 <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-<div class="sidebar-overlay" onclick="toggleSidebar()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999;"></div>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div class="sidebar" id="sidebar">
     <div class="text-center mb-4"><i class="fas fa-store fa-2x"></i><h4 class="mt-2">Hameedia</h4><small class="text-secondary">Admin Menu</small></div>
@@ -142,6 +109,7 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
     <a href="create_order.php" class="nav-link"><i class="fas fa-plus-circle"></i> Create Order</a>
     <a href="all_orders.php" class="nav-link active"><i class="fas fa-list"></i> All Orders</a>
     <a href="branches.php" class="nav-link"><i class="fas fa-store"></i> Branches</a>
+    <a href="product_transfer.php" class="nav-link"><i class="fas fa-exchange-alt"></i> Product Transfer</a>
     <hr>
     <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
     <hr>
@@ -173,7 +141,7 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
         }
         $products = $products_by_order[$order['id']];
         ?>
-        <div class="order-card" data-order-id="<?= $order['id'] ?>" data-updated="<?= strtotime($order['updated_at']) ?>">
+        <div class="order-card">
             <div class="order-header" onclick="toggleOrder(<?= $order['id'] ?>)">
                 <div class="d-flex justify-content-between align-items-center flex-wrap">
                     <div class="d-flex align-items-center gap-3">
@@ -236,45 +204,26 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
                 <h6 class="mt-3"><i class="fas fa-box"></i> Products Ordered</h6>
                 <table class="product-table">
                     <thead>
-                        <tr>
-                            <th>Image</th>
-                            <th>Product Name</th>
-                            <th>Color / Size</th>
-                            <th>SKU</th>
-                            <th>Discount</th>
-                            <th>Price</th>
-                            <th>After Disc.</th>
-                            <th>Availability</th>
-                        </tr>
+                        <tr><th>Image</th><th>Product Name</th><th>Promo / Size</th><th>SKU</th><th>Discount</th><th>Price</th><th>After Disc.</th><th>Availability</th></tr>
                     </thead>
                     <tbody>
                         <?php foreach($products as $product): ?>
                         <tr>
-                            <td>
-                                <?php if($product['image_url']): ?>
-                                    <img src="<?= htmlspecialchars($product['image_url']) ?>" class="product-image" onerror="this.style.display='none'">
-                                <?php else: ?>
-                                    <div class="product-placeholder" style="width:50px; height:50px; background:#e2e8f0; border-radius:8px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-image text-muted"></i></div>
-                                <?php endif; ?>
-                            </td>
+                            <td><?php if($product['image_url']): ?><img src="<?= htmlspecialchars($product['image_url']) ?>" class="product-image" onerror="this.style.display='none'"><?php else: ?>-<?php endif; ?></td>
                             <td><strong><?= htmlspecialchars($product['product_name']) ?></strong></td>
-                            <td>Promo: <?= $product['promocode'] ?> / Size: <?= $product['size'] ?></td>
+                            <td><?= $product['promocode'] ?> / <?= $product['size'] ?></td>
                             <td><small class="text-muted"><?= $product['sku'] ?></small></td>
                             <td><?= $product['discount_percent'] > 0 ? '<span class="discount-tag">-'.$product['discount_percent'].'%</span>' : '-' ?></td>
                             <td class="text-muted">Rs. <?= number_format($product['price'], 2) ?></td>
                             <td class="fw-bold text-success">Rs. <?= number_format($product['after_discount_price'], 2) ?></td>
                             <td>
                                 <?php if($product['product_availability'] == 'not_available'): ?>
-                                    <span class="product-available-badge product-avail-no">
-                                        <i class="fas fa-times-circle"></i> Not Available
-                                    </span>
+                                    <span class="product-avail-no"><i class="fas fa-times-circle"></i> Not Available</span>
                                     <?php if(!empty($product['product_availability_reason'])): ?>
                                         <br><small class="text-muted">Reason: <?= htmlspecialchars($product['product_availability_reason']) ?></small>
                                     <?php endif; ?>
                                 <?php else: ?>
-                                    <span class="product-available-badge product-avail-yes">
-                                        <i class="fas fa-check-circle"></i> Available
-                                    </span>
+                                    <span class="product-avail-yes"><i class="fas fa-check-circle"></i> Available</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -310,64 +259,15 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
     <div class="text-center py-5 bg-white rounded-4"><i class="fas fa-inbox fa-4x text-muted mb-3"></i><h5>No orders found</h5><p class="text-muted">Create your first order from the Create Order page.</p></div>
     <?php endif; ?>
     
-    <footer class="text-center text-muted mt-4 small"><small>© 2024 Hameedia Order Management System</small></footer>
+    <footer class="text-center text-muted mt-4 small"><small>© 2026 Hameedia Order Management System</small></footer>
 </div>
 
 <script>
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        sidebar.classList.toggle('open');
-        if (overlay) overlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
-    }
-    
-    function toggleOrder(id) {
-        const body = document.getElementById('order-body-' + id);
-        const header = body.previousElementSibling;
-        body.classList.toggle('show');
-        header.classList.toggle('collapsed');
-    }
-    
-    let lastUpdateTime = <?= time() ?>;
-    let refreshInterval;
-    
-    async function refreshOrders() {
-        try {
-            const response = await fetch(`all_orders_ajax.php?last_update=${lastUpdateTime}`);
-            const data = await response.json();
-            if (data.orders && data.orders.length > 0) {
-                for (const order of data.orders) {
-                    const orderCard = document.querySelector(`.order-card[data-order-id="${order.id}"]`);
-                    if (orderCard && parseInt(orderCard.dataset.updated) < order.updated) {
-                        location.reload();
-                        return;
-                    }
-                }
-                lastUpdateTime = data.timestamp;
-            }
-        } catch (error) {
-            console.error('Auto-refresh error:', error);
-        }
-    }
-    
-    function startAutoRefresh() {
-        refreshInterval = setInterval(refreshOrders, 10000);
-    }
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        const firstBody = document.querySelector('.order-body');
-        if (firstBody) firstBody.classList.add('show');
-    });
-    
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', function() {
-            if (window.innerWidth < 577) toggleSidebar();
-        });
-    });
-    
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.querySelector('.sidebar-overlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none'; }
+    function toggleOrder(id) { const body = document.getElementById('order-body-' + id); const header = body.previousElementSibling; body.classList.toggle('show'); header.classList.toggle('collapsed'); }
+    document.querySelectorAll('.nav-link').forEach(l => l.addEventListener('click', function() { if(window.innerWidth<577) toggleSidebar(); }));
     document.querySelector('.sidebar-overlay')?.addEventListener('click', toggleSidebar);
-    
-    startAutoRefresh();
+    document.addEventListener('DOMContentLoaded', function() { const first = document.querySelector('.order-body'); if(first) first.classList.add('show'); });
 </script>
 </body>
 </html>

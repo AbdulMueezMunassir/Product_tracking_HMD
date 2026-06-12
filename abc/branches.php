@@ -40,24 +40,36 @@ $branches = $pdo->query("SELECT * FROM branch_managers ORDER BY id DESC")->fetch
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        .sidebar { width: 260px; position: fixed; height: 100vh; background: linear-gradient(135deg, #1e2a3e, #15232e); color: white; padding: 20px; }
-        .main-content { margin-left: 260px; padding: 20px; }
-        .nav-link { color: #cfdde6; padding: 10px 15px; margin: 5px 0; border-radius: 8px; text-decoration: none; display: block; }
-        .nav-link:hover, .nav-link.active { background: #2d3e5a; color: white; }
-        @media (max-width: 768px) { .sidebar { width: 220px; } .main-content { margin-left: 220px; } }
+        .sidebar { width: 280px; position: fixed; left: -280px; height: 100vh; background: linear-gradient(135deg, #1e2a3e, #15232e); color: white; padding: 20px; transition: left 0.3s; z-index: 1000; overflow-y: auto; }
+        .sidebar.open { left: 0; }
+        .main-content { margin-left: 0; padding: 25px 35px; transition: margin-left 0.3s; }
+        @media (min-width: 992px) { .sidebar { left: 0; width: 280px; } .menu-toggle { display: none; } .main-content { margin-left: 280px; } }
+        @media (max-width: 991px) { .main-content { padding: 15px; } .menu-toggle { display: block; position: fixed; top: 15px; left: 15px; z-index: 1001; background: #1e2a3e; color: white; border: none; padding: 10px 15px; border-radius: 10px; cursor: pointer; } }
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .sidebar-overlay.active { display: block; }
+        .nav-link { color: #cfdde6; padding: 12px 20px; margin: 5px 0; border-radius: 12px; text-decoration: none; display: block; transition: all 0.3s; }
+        .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.1); color: white; transform: translateX(5px); }
+        .nav-link i { width: 28px; }
+        @media (max-width: 768px) { .sidebar { width: 240px; } .main-content { margin-left: 240px; } }
     </style>
 </head>
 <body>
-<div class="sidebar">
-    <div class="text-center mb-4"><i class="fas fa-store fa-2x"></i><h4>Hameedia</h4><small>Admin Menu</small></div>
+
+<button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
+    <div class="text-center mb-4"><i class="fas fa-store fa-2x"></i><h4 class="mt-2">Hameedia</h4><small class="text-secondary">Admin Menu</small></div>
     <hr>
     <a href="admin_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
     <a href="create_order.php" class="nav-link"><i class="fas fa-plus-circle"></i> Create Order</a>
     <a href="all_orders.php" class="nav-link"><i class="fas fa-list"></i> All Orders</a>
     <a href="branches.php" class="nav-link active"><i class="fas fa-store"></i> Branches</a>
+    <a href="product_transfer.php" class="nav-link"><i class="fas fa-exchange-alt"></i> Product Transfer</a>
     <hr>
     <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
-    <hr><small><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?></small>
+    <hr>
+    <small class="text-secondary"><i class="fas fa-user-circle"></i> <?= htmlspecialchars($_SESSION['username']) ?></small>
 </div>
 
 <div class="main-content">
@@ -82,5 +94,11 @@ $branches = $pdo->query("SELECT * FROM branch_managers ORDER BY id DESC")->fetch
     <div class="table-responsive"><table class="table table-hover"><thead class="table-light"><tr><th>Code</th><th>Manager Name</th><th>Location</th><th>Username</th><th>Actions</th></tr></thead>
     <tbody><?php foreach($branches as $b): ?><tr><td><?= htmlspecialchars($b['branch_code']) ?></td><td><?= htmlspecialchars($b['manager_name']) ?></td><td><?= htmlspecialchars($b['location']) ?></td><td><?= htmlspecialchars($b['username']) ?></td><td><a href="?delete=<?= $b['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this branch?')"><i class="fas fa-trash"></i> Delete</a></td></tr><?php endforeach; ?></tbody></table></div></div>
 </div>
+
+<script>
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.querySelector('.sidebar-overlay').classList.toggle('active'); }
+    document.querySelectorAll('.nav-link').forEach(l => l.addEventListener('click', function() { if(window.innerWidth<992) toggleSidebar(); }));
+    document.querySelector('.sidebar-overlay')?.addEventListener('click', toggleSidebar);
+</script>
 </body>
 </html>

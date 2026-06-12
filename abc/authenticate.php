@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
+    // Check admin
     if ($username === 'admin' && $password === 'admin123') {
         $_SESSION['user_id'] = 1;
         $_SESSION['role'] = 'admin';
@@ -24,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
+    // Check branch from database
     try {
         $stmt = $pdo->prepare("SELECT * FROM branch_managers WHERE username = ?");
         $stmt->execute([$username]);
@@ -41,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     } catch (PDOException $e) {
+        // Table might not exist yet
     }
     
     $_SESSION['login_error'] = 'Invalid username or password. Please try again.';
