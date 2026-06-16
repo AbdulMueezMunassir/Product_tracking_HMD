@@ -25,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
-    // Check branch from database
+    // Check branch (by username OR email)
     try {
-        $stmt = $pdo->prepare("SELECT * FROM branch_managers WHERE username = ?");
-        $stmt->execute([$username]);
+        $stmt = $pdo->prepare("SELECT * FROM branch_managers WHERE username = ? OR email = ?");
+        $stmt->execute([$username, $username]);
         $branch = $stmt->fetch();
         
         if ($branch && password_verify($password, $branch['password'])) {
@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['branch_id'] = $branch['id'];
             $_SESSION['branch_location'] = $branch['location'];
             $_SESSION['branch_code'] = $branch['branch_code'];
+            $_SESSION['branch_email'] = $branch['email'];
             $_SESSION['username'] = $branch['manager_name'];
             $_SESSION['branch_last_notification_check'] = time();
             header('Location: branch_dashboard.php');

@@ -39,10 +39,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message_action']
     if ($to_type == 'admin') {
         addNotification($pdo, 1, null, 'admin', 'message', "Message from " . $_SESSION['branch_location'] . ": " . $subject, $message_text, "admin_dashboard.php");
         $message = '<div class="alert alert-success">Message sent to Admin!</div>';
+        
+        $admin_email = "admin@hameedia.com";
+        $email_body = "<h2>New Message from {$_SESSION['branch_location']}</h2>
+                       <p><strong>Subject:</strong> $subject</p>
+                       <p><strong>Message:</strong> $message_text</p>";
+        sendEmailNotification($admin_email, "New Message from Branch: $subject", $email_body);
     } else {
         $to_branch = $_POST['to_branch'];
+        $branch_info = $pdo->prepare("SELECT email, location FROM branch_managers WHERE id = ?");
+        $branch_info->execute([$to_branch]);
+        $target_branch = $branch_info->fetch();
+        
         addNotification($pdo, null, $to_branch, 'branch', 'message', "Message from " . $_SESSION['branch_location'] . ": " . $subject, $message_text, "branch_dashboard.php");
         $message = '<div class="alert alert-success">Message sent to branch!</div>';
+        
+        if ($target_branch && $target_branch['email']) {
+            $email_body = "<h2>New Message from Another Branch</h2>
+                           <p><strong>From:</strong> {$_SESSION['branch_location']}</p>
+                           <p><strong>Subject:</strong> $subject</p>
+                           <p><strong>Message:</strong> $message_text</p>";
+            sendEmailNotification($target_branch['email'], "New Message: $subject", $email_body);
+        }
     }
 }
 
@@ -65,6 +83,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_product'])) {
     
     addNotification($pdo, null, $supplying_branch, 'branch', 'request', "Product Request from " . $_SESSION['branch_location'], "Request for product: $product_name (Order #$order_id): $request_message", "branch_dashboard.php?tab=requests");
     $message = '<div class="alert alert-success">Product request sent!</div>';
+    
+    if ($supply_branch && $supply_branch['email']) {
+        $email_body = "<h2>Product Request Received</h2>
+                       <p><strong>Requesting Branch:</strong> {$_SESSION['branch_location']}</p>
+                       <p><strong>Order #:</strong> $order_id</p>
+                       <p><strong>Product:</strong> $product_name (SKU: $sku, Size: $size)</p>
+                       <p><strong>Message:</strong> $request_message</p>";
+        sendEmailNotification($supply_branch['email'], "Product Request from " . $_SESSION['branch_location'], $email_body);
+    }
 }
 
 // Handle request response
@@ -89,12 +116,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['respond_request'])) {
 $selected_order = null;
 $selected_products = [];
 if ($view_order_id) {
-    $stmt = $pdo->prepare("SELECT * FROM shop_orders WHERE id = ? AND branch_id = ?");
-    $stmt->execute([$view_order_id, $branch_id]);
+    $stmt = $pdo->prepare("SELECT * FROM shop_orders WHERE id = ?");
+    $stmt->execute([$view_order_id]);
     $selected_order = $stmt->fetch();
+    
     if ($selected_order) {
-        $stmt = $pdo->prepare("SELECT * FROM order_products WHERE order_id = ?");
-        $stmt->execute([$view_order_id]);
+        $stmt = $pdo->prepare("SELECT op.*, b.location as assigned_location, b.branch_code as assigned_code 
+                               FROM order_products op 
+                               LEFT JOIN branch_managers b ON op.assign_showroom = b.id 
+                               WHERE op.order_id = ? AND (op.assign_showroom = ? OR op.assign_showroom IS NULL)");
+        $stmt->execute([$view_order_id, $branch_id]);
         $selected_products = $stmt->fetchAll();
     }
 }
@@ -112,7 +143,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_order'])) {
     $order_data = $stmt->fetch();
     $order_no = $order_data['order_no'];
     
-    // Determine workflow status
     if ($product_availability == 'not_available') {
         $workflow_status = 'not_collected';
         $collection_status = 'No'; $packing_status = 'No'; $dispatch_status = 'No';
@@ -145,8 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_order'])) {
         $updateProduct->execute([$product_availabilities[$i], $product_reasons[$i], $product_ids[$i]]);
     }
     
-    $stmt = $pdo->prepare("UPDATE shop_orders SET packing_status=?, dispatch_status=?, collection_status=?, collection_notes=?, invoice_no=?, branch_comment=?, barcode_number=?, product_availability=?, unavailability_reason=?, partial_comment=?, workflow_status=?, last_status_update=NOW(), status='Confirmed', updated_at=NOW() WHERE id=? AND branch_id=?");
-    $stmt->execute([$packing_status, $dispatch_status, $collection_status, $collection_notes, $invoice, $branch_comment, $barcode_number, $product_availability, $unavailability_reason, $partial_comment, $workflow_status, $order_id, $branch_id]);
+    $stmt = $pdo->prepare("UPDATE shop_orders SET packing_status=?, dispatch_status=?, collection_status=?, collection_notes=?, invoice_no=?, branch_comment=?, barcode_number=?, product_availability=?, unavailability_reason=?, partial_comment=?, workflow_status=?, last_status_update=NOW(), status='Confirmed', updated_at=NOW() WHERE id=?");
+    $stmt->execute([$packing_status, $dispatch_status, $collection_status, $collection_notes, $invoice, $branch_comment, $barcode_number, $product_availability, $unavailability_reason, $partial_comment, $workflow_status, $order_id]);
     
     addNotification($pdo, 1, null, 'admin', 'order_update', "Order #{$order_no} Status Updated", "Branch updated order to: " . ucfirst(str_replace('_', ' ', $workflow_status)), "all_orders.php");
     $_SESSION['branch_success_message'] = "Order #{$order_no} updated! Status: " . ucfirst(str_replace('_', ' ', $workflow_status));
@@ -163,7 +193,7 @@ $sent_requests = $pdo->prepare("SELECT pr.*, o.order_no, o.customer_name, b.loca
 $sent_requests->execute([$branch_id]);
 $sent_requests = $sent_requests->fetchAll();
 
-$all_branches = $pdo->prepare("SELECT id, branch_code, location FROM branch_managers WHERE id != ?");
+$all_branches = $pdo->prepare("SELECT id, branch_code, location, email FROM branch_managers WHERE id != ?");
 $all_branches->execute([$branch_id]);
 $all_branches = $all_branches->fetchAll();
 
@@ -172,28 +202,33 @@ $notifications->execute([$branch_id]);
 $notification_list = $notifications->fetchAll();
 $notification_count = count($notification_list);
 
-$total_orders = $pdo->prepare("SELECT COUNT(*) FROM shop_orders WHERE branch_id = ?");
-$total_orders->execute([$branch_id]);
-$total_orders = $total_orders->fetchColumn();
-
-$stats = $pdo->prepare("SELECT SUM(CASE WHEN workflow_status = 'not_collected' OR workflow_status IS NULL THEN 1 ELSE 0 END) as not_collected, SUM(CASE WHEN workflow_status = 'collecting' THEN 1 ELSE 0 END) as collecting, SUM(CASE WHEN workflow_status = 'packing' THEN 1 ELSE 0 END) as packing, SUM(CASE WHEN workflow_status = 'dispatching' THEN 1 ELSE 0 END) as dispatching, SUM(CASE WHEN product_availability = 'partial' THEN 1 ELSE 0 END) as partial, SUM(CASE WHEN product_availability = 'not_available' THEN 1 ELSE 0 END) as not_available, SUM(CASE WHEN packing_status = 'Yes' AND dispatch_status = 'Yes' THEN 1 ELSE 0 END) as completed FROM shop_orders WHERE branch_id = ?");
-$stats->execute([$branch_id]);
-$stats_data = $stats->fetch();
-
-// Build filter condition
-$filter_condition = "";
-if ($status_filter == 'not_collected') { $filter_condition = "AND (workflow_status = 'not_collected' OR workflow_status IS NULL)";
-} elseif ($status_filter == 'collecting') { $filter_condition = "AND workflow_status = 'collecting'";
-} elseif ($status_filter == 'packing') { $filter_condition = "AND workflow_status = 'packing'";
-} elseif ($status_filter == 'dispatching') { $filter_condition = "AND workflow_status = 'dispatching'";
-} elseif ($status_filter == 'partial') { $filter_condition = "AND product_availability = 'partial'";
-} elseif ($status_filter == 'not_available') { $filter_condition = "AND product_availability = 'not_available'";
-} elseif ($status_filter == 'completed') { $filter_condition = "AND packing_status = 'Yes' AND dispatch_status = 'Yes'";
-}
-
-$orders_query = $pdo->prepare("SELECT o.*, (SELECT COUNT(*) FROM order_products WHERE order_id = o.id) as items_count FROM shop_orders o WHERE o.branch_id = ? $filter_condition ORDER BY o.created_at DESC");
-$orders_query->execute([$branch_id]);
+// FIXED QUERY - Get orders that have products assigned to this branch
+$orders_query = $pdo->prepare("
+    SELECT DISTINCT o.*, 
+        (SELECT COUNT(*) FROM order_products WHERE order_id = o.id AND (assign_showroom = ? OR assign_showroom IS NULL)) as items_count 
+    FROM shop_orders o 
+    INNER JOIN order_products op ON o.id = op.order_id 
+    WHERE (op.assign_showroom = ? OR op.assign_showroom IS NULL)
+    ORDER BY o.created_at DESC
+");
+$orders_query->execute([$branch_id, $branch_id]);
 $orders_list = $orders_query->fetchAll();
+
+// Get statistics based on orders assigned to this branch
+$total_orders = count($orders_list);
+$pending_orders = 0;
+$packing_count = 0;
+$dispatching_count = 0;
+$partial_count = 0;
+$completed_count = 0;
+
+foreach ($orders_list as $order) {
+    if ($order['workflow_status'] == 'packing') $packing_count++;
+    elseif ($order['workflow_status'] == 'dispatching') $dispatching_count++;
+    elseif ($order['product_availability'] == 'partial') $partial_count++;
+    elseif ($order['packing_status'] == 'Yes' && $order['dispatch_status'] == 'Yes') $completed_count++;
+    else $pending_orders++;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -250,14 +285,12 @@ $orders_list = $orders_query->fetchAll();
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: all 0.2s; cursor: pointer; }
         .stat-card:hover { transform: translateY(-5px); }
-        .stat-card.filter-active { border: 3px solid #0284c7; }
         .stat-number { font-size: 2rem; font-weight: 700; }
         .stat-label { color: #64748b; font-size: 0.85rem; }
         
         .search-card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 25px; }
         .btn-search { background: #0284c7; color: white; border: none; padding: 10px 25px; border-radius: 30px; }
         .btn-clear { background: #64748b; color: white; border: none; padding: 10px 25px; border-radius: 30px; text-decoration: none; display: inline-block; }
-        .clear-filter-btn { background: #e2e8f0; color: #1e293b; border: none; padding: 8px 20px; border-radius: 30px; font-size: 0.8rem; margin-left: 10px; cursor: pointer; }
         
         .orders-table-container { background: white; border-radius: 20px; overflow-x: auto; }
         .orders-table { width: 100%; border-collapse: collapse; min-width: 800px; }
@@ -287,6 +320,7 @@ $orders_list = $orders_query->fetchAll();
         
         .product-card { background: #f8fafc; border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
         .product-image { width: 60px; height: 60px; object-fit: cover; border-radius: 10px; background: white; }
+        .assigned-badge { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; display: inline-block; }
         .status-form { background: #f8fafc; padding: 20px 25px; border-radius: 0 0 20px 20px; }
         .radio-group { display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap; }
         .radio-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -410,7 +444,7 @@ $orders_list = $orders_query->fetchAll();
             </div>
             
         <?php elseif ($view_order_id && $selected_order): ?>
-            <a href="branch_dashboard.php?tab=orders&filter=<?= $status_filter ?>" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+            <a href="branch_dashboard.php?tab=orders" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
             <div class="order-details-card">
                 <div class="card-header-custom"><h4>Order #<?= htmlspecialchars($selected_order['order_no']) ?></h4></div>
                 <div class="info-section">
@@ -424,13 +458,13 @@ $orders_list = $orders_query->fetchAll();
                 <div class="info-section">
                     <div class="info-grid">
                         <div class="info-item"><div class="info-label">Order #</div><div class="info-value"><?= $selected_order['order_no'] ?></div></div>
-                        <div class="info-item"><div class="info-label">KOKO ID</div><div class="info-value"><?= $selected_order['koko_online_id'] ?: '-' ?></div></div>
+                        <div class="info-item"><div class="info-label">Online ID</div><div class="info-value"><?= $selected_order['koko_online_id'] ?: '-' ?></div></div>
                         <div class="info-item"><div class="info-label">Shipping</div><div class="info-value">Rs. <?= number_format($selected_order['shipping_charges'], 2) ?></div></div>
                         <div class="info-item"><div class="info-label">Total</div><div class="info-value text-success fw-bold">Rs. <?= number_format($selected_order['total_amount'], 2) ?></div></div>
                     </div>
                 </div>
                 <div class="info-section">
-                    <h6>Products</h6>
+                    <h6>Products Ordered</h6>
                     <?php foreach($selected_products as $product): ?>
                     <div class="product-card">
                         <div class="d-flex gap-3">
@@ -441,7 +475,10 @@ $orders_list = $orders_query->fetchAll();
                             <?php endif; ?>
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between">
-                                    <div><strong><?= $product['product_name'] ?></strong><br><small>Promo: <?= $product['promocode'] ?> | Size <?= $product['size'] ?> | SKU: <?= $product['sku'] ?></small></div>
+                                    <div>
+                                        <strong><?= htmlspecialchars($product['product_name']) ?></strong><br>
+                                        <small>Promo: <?= htmlspecialchars($product['promocode']) ?> | Size <?= $product['size'] ?> | SKU: <?= $product['sku'] ?></small>
+                                    </div>
                                     <div class="text-end"><strong class="text-success">Rs. <?= number_format($product['after_discount_price'], 2) ?></strong></div>
                                 </div>
                                 <div class="mt-2 border-top pt-2">
@@ -545,23 +582,20 @@ $orders_list = $orders_query->fetchAll();
             </div>
             
         <?php else: ?>
-            <?php if($status_filter != 'all'): ?>
-                <div class="mb-3 text-end"><a href="branch_dashboard.php?tab=orders" class="clear-filter-btn"><i class="fas fa-times"></i> Clear Filter: <?= ucfirst(str_replace('_', ' ', $status_filter)) ?></a></div>
-            <?php endif; ?>
-            
+            <!-- Dashboard View -->
             <div class="stats-grid">
-                <div class="stat-card <?= $status_filter == 'all' ? 'filter-active' : '' ?>" onclick="applyFilter('all')"><div class="stat-number"><?= $total_orders ?></div><div class="stat-label">Total Orders</div></div>
-                <div class="stat-card <?= $status_filter == 'pending' ? 'filter-active' : '' ?>" onclick="applyFilter('pending')"><div class="stat-number"><?= ($stats_data['not_collected'] ?? 0) + ($stats_data['collecting'] ?? 0) ?></div><div class="stat-label">Pending</div></div>
-                <div class="stat-card <?= $status_filter == 'packing' ? 'filter-active' : '' ?>" onclick="applyFilter('packing')"><div class="stat-number"><?= $stats_data['packing'] ?? 0 ?></div><div class="stat-label">Packing</div></div>
-                <div class="stat-card <?= $status_filter == 'dispatching' ? 'filter-active' : '' ?>" onclick="applyFilter('dispatching')"><div class="stat-number"><?= $stats_data['dispatching'] ?? 0 ?></div><div class="stat-label">Dispatching</div></div>
-                <div class="stat-card <?= $status_filter == 'partial' ? 'filter-active' : '' ?>" onclick="applyFilter('partial')"><div class="stat-number"><?= ($stats_data['partial'] ?? 0) + ($stats_data['not_available'] ?? 0) ?></div><div class="stat-label">Partial/Not Avail</div></div>
-                <div class="stat-card <?= $status_filter == 'completed' ? 'filter-active' : '' ?>" onclick="applyFilter('completed')"><div class="stat-number"><?= $stats_data['completed'] ?? 0 ?></div><div class="stat-label">Completed</div></div>
+                <div class="stat-card" onclick="applyFilter('all')"><div class="stat-number"><?= $total_orders ?></div><div class="stat-label">Total Orders</div></div>
+                <div class="stat-card" onclick="applyFilter('pending')"><div class="stat-number"><?= $pending_orders ?></div><div class="stat-label">Pending</div></div>
+                <div class="stat-card" onclick="applyFilter('packing')"><div class="stat-number"><?= $packing_count ?></div><div class="stat-label">Packing</div></div>
+                <div class="stat-card" onclick="applyFilter('dispatching')"><div class="stat-number"><?= $dispatching_count ?></div><div class="stat-label">Dispatching</div></div>
+                <div class="stat-card" onclick="applyFilter('partial')"><div class="stat-number"><?= $partial_count ?></div><div class="stat-label">Partial/Not Avail</div></div>
+                <div class="stat-card" onclick="applyFilter('completed')"><div class="stat-number"><?= $completed_count ?></div><div class="stat-label">Completed</div></div>
             </div>
             
             <div class="search-card">
                 <form onsubmit="return false;" class="row g-3">
                     <div class="col-md-9"><label><i class="fas fa-search"></i> Search Orders</label><input type="text" id="searchInput" class="form-control" placeholder="Search by Order Number or Customer..." value="<?= htmlspecialchars($search_query) ?>"></div>
-                    <div class="col-md-3 d-flex gap-2 align-items-end"><button type="button" class="btn-search w-100" onclick="performSearch()">Search</button><?php if($search_query): ?><a href="branch_dashboard.php?tab=orders&filter=<?= $status_filter ?>" class="btn-clear">Clear</a><?php endif; ?></div>
+                    <div class="col-md-3 d-flex gap-2 align-items-end"><button type="button" class="btn-search w-100" onclick="performSearch()">Search</button><?php if($search_query): ?><a href="branch_dashboard.php?tab=orders" class="btn-clear">Clear</a><?php endif; ?></div>
                 </form>
             </div>
             
@@ -572,21 +606,33 @@ $orders_list = $orders_query->fetchAll();
                         <?php foreach($orders_list as $order): 
                             if($order['product_availability'] == 'partial') { $status_class = 'status-partial'; $status_text = 'Partial';
                             } elseif($order['product_availability'] == 'not_available') { $status_class = 'status-not_collected'; $status_text = 'Not Available';
-                            } elseif($order['workflow_status']) { $status_class = 'status-' . $order['workflow_status']; $status_text = ucfirst(str_replace('_', ' ', $order['workflow_status']));
-                            } else { $status_class = 'status-not_collected'; $status_text = 'Not Collected'; }
+                            } elseif($order['workflow_status'] == 'packing') { $status_class = 'status-packing'; $status_text = 'Packing';
+                            } elseif($order['workflow_status'] == 'dispatching') { $status_class = 'status-dispatching'; $status_text = 'Dispatching';
+                            } elseif($order['workflow_status'] == 'collecting') { $status_class = 'status-collecting'; $status_text = 'Collecting';
+                            } elseif($order['packing_status'] == 'Yes' && $order['dispatch_status'] == 'Yes') { $status_class = 'status-completed'; $status_text = 'Completed';
+                            } else { $status_class = 'status-not_collected'; $status_text = 'Pending'; }
                         ?>
-                        <tr onclick="location.href='?tab=orders&view_order=<?= $order['id'] ?>&filter=<?= $status_filter ?>'">
+                        <tr onclick="location.href='?tab=orders&view_order=<?= $order['id'] ?>'">
                             <td><strong>#<?= htmlspecialchars($order['order_no']) ?></strong></td>
                             <td><?= htmlspecialchars($order['customer_name']) ?></td>
                             <td><?= date('d M Y', strtotime($order['created_at'])) ?></td>
                             <td><?= $order['items_count'] ?? 1 ?></td>
                             <td>Rs. <?= number_format($order['total_amount'], 2) ?></td>
                             <td><span class="workflow-badge <?= $status_class ?>"><?= $status_text ?></span></td>
-                            <td><button class="view-btn" onclick="event.stopPropagation();location.href='?tab=orders&view_order=<?= $order['id'] ?>&filter=<?= $status_filter ?>'">View</button></td>
+                            <td><button class="view-btn" onclick="event.stopPropagation();location.href='?tab=orders&view_order=<?= $order['id'] ?>'">View</button></td>
                         </tr>
                         <?php endforeach; ?>
+                        <?php if(count($orders_list) == 0): ?>
+                            <tr><td colspan="7" class="text-center py-5">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i><br>
+                                No orders assigned to your showroom yet.<br>
+                                <small class="text-muted">Orders will appear here when products are assigned to your showroom.</small>
+                             </div>
+                        </div>
+                        </tr>
+                        <?php endif; ?>
                     </tbody>
-                </table>
+                <tr>
             </div>
         <?php endif; ?>
     </div>
@@ -639,13 +685,14 @@ $orders_list = $orders_query->fetchAll();
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let currentTab = <?= json_encode($active_tab) ?>;
-    let currentFilter = <?= json_encode($status_filter) ?>;
     
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.querySelector('.sidebar-overlay').classList.toggle('active'); }
     function toggleNotification() { document.getElementById('notificationDropdown').classList.toggle('show'); }
-    function performSearch() { window.location.href = 'branch_dashboard.php?tab=orders&filter=' + currentFilter + '&search=' + encodeURIComponent(document.getElementById('searchInput').value); }
+    function performSearch() { window.location.href = 'branch_dashboard.php?tab=orders&search=' + encodeURIComponent(document.getElementById('searchInput').value); }
     function toggleBranchSelect() { document.getElementById('branchSelectDiv').style.display = document.getElementById('messageToType').value == 'branch' ? 'block' : 'none'; }
-    function applyFilter(filter) { window.location.href = 'branch_dashboard.php?tab=orders&filter=' + filter; }
+    function applyFilter(filter) { 
+        window.location.href = 'branch_dashboard.php?tab=orders&filter=' + filter; 
+    }
     
     function showRequestModal(pid, pname, psku, psize, oid) {
         document.getElementById('req_product_id').value = pid;

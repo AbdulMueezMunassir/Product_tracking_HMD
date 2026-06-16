@@ -1,7 +1,0 @@
-Setup Instructions:
-1. Install XAMPP
-2. Copy 'abc' folder to htdocs/
-3. Open phpMyAdmin, create database 'your_db_name'
-4. Import database.sql
-5. Update db connection in config.php
-6. Visit http://localhost/abc/admin_dashboard.php

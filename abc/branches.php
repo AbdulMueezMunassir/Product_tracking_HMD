@@ -13,13 +13,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_branch'])) {
     $branch_code = $_POST['branch_code'];
     $manager_name = $_POST['manager_name'];
     $location = $_POST['location'];
+    $email = $_POST['email'];
     $username = $_POST['username'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
     
     try {
-        $stmt = $pdo->prepare("INSERT INTO branch_managers (branch_code, manager_name, location, username, password) VALUES (?,?,?,?,?)");
-        $stmt->execute([$branch_code, $manager_name, $location, $username, $password]);
-        $message = '<div class="alert alert-success">Branch created! Login: ' . $username . '</div>';
+        $stmt = $pdo->prepare("INSERT INTO branch_managers (branch_code, manager_name, location, email, username, password) VALUES (?,?,?,?,?,?)");
+        $stmt->execute([$branch_code, $manager_name, $location, $email, $username, $password]);
+        $message = '<div class="alert alert-success">Branch created! Login: ' . $username . ' | Email: ' . $email . '</div>';
+        
+        // Send email notification to branch manager
+        $subject = "Welcome to Hameedia Order Management System";
+        $body = "<h2>Welcome to Hameedia</h2>
+                 <p>Dear $manager_name,</p>
+                 <p>Your branch account has been created successfully.</p>
+                 <p><strong>Login Credentials:</strong></p>
+                 <ul>
+                     <li>Username: $username</li>
+                     <li>Password: " . $_POST['password'] . "</li>
+                     <li>Login URL: http://localhost/abc/index.php</li>
+                 </ul>
+                 <p>Please change your password after first login.</p>
+                 <p>Best regards,<br>Hameedia Head Office</p>";
+        sendEmailNotification($email, $subject, $body);
+        
     } catch (PDOException $e) {
         $message = '<div class="alert alert-danger">Error: ' . $e->getMessage() . '</div>';
     }
@@ -50,7 +67,6 @@ $branches = $pdo->query("SELECT * FROM branch_managers ORDER BY id DESC")->fetch
         .nav-link { color: #cfdde6; padding: 12px 20px; margin: 5px 0; border-radius: 12px; text-decoration: none; display: block; transition: all 0.3s; }
         .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.1); color: white; transform: translateX(5px); }
         .nav-link i { width: 28px; }
-        @media (max-width: 768px) { .sidebar { width: 240px; } .main-content { margin-left: 240px; } }
     </style>
 </head>
 <body>
@@ -66,6 +82,7 @@ $branches = $pdo->query("SELECT * FROM branch_managers ORDER BY id DESC")->fetch
     <a href="all_orders.php" class="nav-link"><i class="fas fa-list"></i> All Orders</a>
     <a href="branches.php" class="nav-link active"><i class="fas fa-store"></i> Branches</a>
     <a href="product_transfer.php" class="nav-link"><i class="fas fa-exchange-alt"></i> Product Transfer</a>
+    <a href="payment_modes.php" class="nav-link"><i class="fas fa-credit-card"></i> Payment Modes</a>
     <hr>
     <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
     <hr>
@@ -80,19 +97,20 @@ $branches = $pdo->query("SELECT * FROM branch_managers ORDER BY id DESC")->fetch
     <div class="card-body">
         <form method="POST">
             <div class="row g-3">
-                <div class="col-md-3"><label class="form-label">Branch Code</label><input type="text" name="branch_code" class="form-control" placeholder="e.g., COL-01" required></div>
-                <div class="col-md-3"><label class="form-label">Manager Name</label><input type="text" name="manager_name" class="form-control" required></div>
-                <div class="col-md-3"><label class="form-label">Location</label><input type="text" name="location" class="form-control" placeholder="e.g., Colombo Showroom" required></div>
-                <div class="col-md-3"><label class="form-label">Login Username</label><input type="text" name="username" class="form-control" required></div>
-                <div class="col-md-3"><label class="form-label">Login Password</label><input type="text" name="password" class="form-control" value="admin123" required></div>
+                <div class="col-md-3"><label class="form-label">Branch Code *</label><input type="text" name="branch_code" class="form-control" placeholder="e.g., COL-01" required></div>
+                <div class="col-md-3"><label class="form-label">Manager Name *</label><input type="text" name="manager_name" class="form-control" required></div>
+                <div class="col-md-3"><label class="form-label">Location *</label><input type="text" name="location" class="form-control" placeholder="e.g., Colombo Showroom" required></div>
+                <div class="col-md-3"><label class="form-label">Email *</label><input type="email" name="email" class="form-control" placeholder="manager@branch.com" required></div>
+                <div class="col-md-3"><label class="form-label">Login Username *</label><input type="text" name="username" class="form-control" required></div>
+                <div class="col-md-3"><label class="form-label">Login Password *</label><input type="text" name="password" class="form-control" value="admin123" required></div>
                 <div class="col-md-3 align-self-end"><button type="submit" name="add_branch" class="btn btn-dark"><i class="fas fa-plus"></i> Create Branch</button></div>
             </div>
         </form>
     </div></div>
     
     <div class="card"><div class="card-header bg-white fw-bold"><i class="fas fa-list"></i> Existing Branches</div>
-    <div class="table-responsive"><table class="table table-hover"><thead class="table-light"><tr><th>Code</th><th>Manager Name</th><th>Location</th><th>Username</th><th>Actions</th></tr></thead>
-    <tbody><?php foreach($branches as $b): ?><tr><td><?= htmlspecialchars($b['branch_code']) ?></td><td><?= htmlspecialchars($b['manager_name']) ?></td><td><?= htmlspecialchars($b['location']) ?></td><td><?= htmlspecialchars($b['username']) ?></td><td><a href="?delete=<?= $b['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this branch?')"><i class="fas fa-trash"></i> Delete</a></td></tr><?php endforeach; ?></tbody></table></div></div>
+    <div class="table-responsive"><table class="table table-hover"><thead class="table-light"><tr><th>Code</th><th>Manager Name</th><th>Location</th><th>Email</th><th>Username</th><th>Actions</th></tr></thead>
+    <tbody><?php foreach($branches as $b): ?><tr><td><?= htmlspecialchars($b['branch_code']) ?></td><td><?= htmlspecialchars($b['manager_name']) ?></td><td><?= htmlspecialchars($b['location']) ?></td><td><?= htmlspecialchars($b['email']) ?></td><td><?= htmlspecialchars($b['username']) ?></td><td><a href="?delete=<?= $b['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this branch?')"><i class="fas fa-trash"></i> Delete</a></td></tr><?php endforeach; ?></tbody></table></div></div>
 </div>
 
 <script>

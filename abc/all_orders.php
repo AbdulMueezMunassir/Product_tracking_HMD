@@ -109,6 +109,7 @@ $branches = $pdo->query("SELECT id, branch_code, location FROM branch_managers")
     <a href="create_order.php" class="nav-link"><i class="fas fa-plus-circle"></i> Create Order</a>
     <a href="all_orders.php" class="nav-link active"><i class="fas fa-list"></i> All Orders</a>
     <a href="branches.php" class="nav-link"><i class="fas fa-store"></i> Branches</a>
+    <a href="payment_modes.php" class="nav-link"><i class="fas fa-credit-card"></i> Payment Modes</a>
     <a href="product_transfer.php" class="nav-link"><i class="fas fa-exchange-alt"></i> Product Transfer</a>
     <hr>
     <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
