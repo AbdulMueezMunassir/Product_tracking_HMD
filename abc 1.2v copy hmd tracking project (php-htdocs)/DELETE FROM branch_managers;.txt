@@ -1,0 +1,2 @@
+DELETE FROM branch_managers;
+ALTER TABLE branch_managers AUTO_INCREMENT = 1;
